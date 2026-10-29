@@ -1,0 +1,6 @@
+title: "Sample site"
+description: "A small site to try the YiiPress sample theme"
+base_url: "https://example.com/"
+languages: ["en"]
+taxonomies: ["tags"]
+theme: theme-sample

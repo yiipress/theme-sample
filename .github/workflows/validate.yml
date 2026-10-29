@@ -1,0 +1,69 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manifest:
+    name: Manifest and package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      # The manifest reader of the engine, as `get:theme` runs it. Pinned to the commit of yiipress/engine#189
+      # until a release ships it; then pin the release tag.
+      - name: Checkout YiiPress
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: yiipress/engine
+          ref: 4aaa3927571c7902419b8d816f2e546776fc558f
+          path: engine
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962
+        with:
+          php-version: '8.5'
+          extensions: yaml, mbstring, pcntl, xmlwriter
+          coverage: none
+
+      # Only the plain manifest classes are used: no plugins or scripts, and the engine's native extensions are not
+      # needed to read a manifest.
+      - name: Install YiiPress dependencies
+        working-directory: engine
+        run: >-
+          composer install --no-dev --no-plugins --no-scripts --no-progress --no-interaction
+          --ignore-platform-req=ext-highlighter --ignore-platform-req=ext-mdparser --ignore-platform-req=ext-inotify
+
+      - name: Validate extension.yaml and package/
+        run: php .github/validate-manifest.php engine .
+
+  example:
+    name: Example site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Use the theme in the example site
+        run: mkdir -p example/themes && cp -r package example/themes/theme-sample
+
+      - name: Build the example site
+        uses: yiipress/engine/.github/actions/build@702e9a50a205de337da4c206d8262213a3676310 # 0.1.13
+        with:
+          version: 0.1.13
+          working-directory: example
